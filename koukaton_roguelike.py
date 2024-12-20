@@ -82,6 +82,32 @@ class Player:
             self.hp += damage
             self.next_attack_heal = False
 
+# 敵クラス
+class Enemy:
+    def __init__(self, atk, def_, hp):
+        self.atk = atk  # 攻撃力
+        self.def_ = def_  # 防御力
+        self.hp = hp  # 体力（低めに設定）
+        self.skills = random.sample(skill_pool, 2)  # 初期から2つのスキルをランダムに所持
+
+    def take_damage(self, damage):
+        reduced_damage = max(0, damage - self.def_)
+        self.hp -= reduced_damage
+        return self.hp
+
+    def normal_attack(self, target):
+        target.take_damage(self.atk)
+
+# 敵のパターン定義
+def generate_enemy_patterns():
+    return [
+        Enemy(atk=8, def_=3, hp=40),  # 攻撃型
+        Enemy(atk=5, def_=6, hp=50),  # 防御型
+        Enemy(atk=6, def_=4, hp=45),  # バランス型
+        Enemy(atk=10, def_=2, hp=35), # 高火力型
+        Enemy(atk=4, def_=7, hp=55)   # タンク型
+    ]
+
 # 迷路生成関数
 def generate_maze(width, height):
     maze = [[1 for _ in range(width)] for _ in range(height)]
