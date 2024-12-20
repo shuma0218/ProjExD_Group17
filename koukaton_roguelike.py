@@ -1,188 +1,197 @@
 import os
 import sys
-import random
 import pygame as pg
+import random
+
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-class MapGenerator:
-    """
-    迷路とイベントマスを生成するクラス。
-    """
-    def __init__(self, width: int, height: int):
-        """
-        迷路の初期化を行う。
-        :param width: 迷路の幅（マス単位、奇数）
-        :param height: 迷路の高さ（マス単位、奇数）
-        """
-        self.width: int = width
-        self.height: int = height
-        self.map: list[list[int]] = [[1 for _ in range(width)] for _ in range(height)]  # 1: 壁, 0: 道
-        self.event_tiles: list[tuple[tuple[int, int], str]] = []
-        self.start_tile: tuple[int, int] = (1, 1)
+# 定数設定
+WIDTH, HEIGHT = 11, 11  # 11x11マスで固定
+CELL_SIZE = 40
+WINDOW_WIDTH, WINDOW_HEIGHT = 800, 600
 
-    def generate_maze(self) -> None:
-        """
-        深さ優先探索を使って迷路を生成する。
-        """
-        def carve_passages(cx: int, cy: int) -> None:
-            """
-            迷路の通路を掘り進める関数。
-            :param cx: 現在のx座標
-            :param cy: 現在のy座標
-            """
-            directions = [(0, -2), (0, 2), (-2, 0), (2, 0)]
-            random.shuffle(directions)
-            for dx, dy in directions:
-                nx, ny = cx + dx, cy + dy
-                if 0 < nx < self.width - 1 and 0 < ny < self.height - 1 and self.map[ny][nx] == 1:
-                    self.map[cy + dy // 2][cx + dx // 2] = 0  # 隣接マスとの間を道にする
-                    self.map[ny][nx] = 0
-                    carve_passages(nx, ny)
+# 色の定義
+WHITE = (255, 255, 255)
+TRANSPARENT = (0, 0, 0, 0)
+RED = (255, 0, 0)    # 戦闘マス
+GREEN = (0, 255, 0)  # 回復マス
+BLUE = (0, 0, 255)   # 強化マス
+PURPLE = (128, 0, 128)  # ボスマス
 
-        # 初期化とスタート地点の設定
-        for y in range(self.height):
-            for x in range(self.width):
-                self.map[y][x] = 1
-        self.map[1][1] = 0  # スタート地点
-        carve_passages(1, 1)
-        self.place_events()
+# イベントマスの種類
+EVENT_TYPES = {
+    "battle": RED,
+    "heal": GREEN,
+    "buff": BLUE,
+    "boss": PURPLE
+}
 
-    def place_events(self) -> None:
-        """
-        イベントマス（回復、強化、敵、ゴール）をランダムに配置する。
-        スタート地点には配置されないようにする。
-        ゴールマスは迷路の端に一つだけ配置する。
-        """
-        # 空いているマスを取得し、スタート地点を除外
-        candidates = [(x, y) for y in range(1, self.height, 2) for x in range(1, self.width, 2)
-                      if self.map[y][x] == 0 and (x, y) != self.start_tile]
-        edge_candidates = [(x, y) for x, y in candidates if x == 1 or y == 1 or x == self.width - 2 or y == self.height - 2]
-        random.shuffle(candidates)
-        random.shuffle(edge_candidates)
+# 迷路生成関数
+def generate_maze(width, height):
+    maze = [[1 for _ in range(width)] for _ in range(height)]
+    stack = []
 
-        # 回復マス
-        if candidates:
-            self.event_tiles.append((candidates.pop(), "heal"))
-        # 強化マス
-        for _ in range(random.randint(0, 2)):
-            if candidates:
-                self.event_tiles.append((candidates.pop(), "buff"))
-        # 敵マス
-        for _ in range(3):
-            if candidates:
-                self.event_tiles.append((candidates.pop(), "enemy"))
-        # ゴールマス（端に一つだけ配置）
-        if edge_candidates:
-            goal_tile = edge_candidates.pop()
-            
-            self.event_tiles.append((goal_tile, "goal"))
+    # 初期位置
+    start_x, start_y = 1, 1
+    maze[start_y][start_x] = 0
+    stack.append((start_x, start_y))
 
-    def draw(self, screen: pg.Surface, tile_size: int) -> None:
-        """
-        迷路とイベントマスを描画する。
-        :param screen: Pygameの描画対象Surface
-        :param tile_size: 1マスあたりのサイズ（ピクセル単位）
-        """
-        for y, row in enumerate(self.map):
-            for x, tile in enumerate(row):
-                color = (255, 255, 255) if tile == 0 else (0, 0, 0)
-                pg.draw.rect(screen, color, (x * tile_size, y * tile_size, tile_size, tile_size))
-        for (x, y), event in self.event_tiles:
-            if event == "heal":
-                color = (0, 255, 0)
-            elif event == "buff":
-                color = (0, 0, 255)
-            elif event == "enemy":
-                color = (255, 0, 0)
-            elif event == "goal":
-                color = (255, 255, 0)
-            pg.draw.rect(screen, color, (x * tile_size, y * tile_size, tile_size, tile_size))
+    # 移動方向
+    directions = [(-2, 0), (2, 0), (0, -2), (0, 2)]
 
-class Player:
-    """
-    プレイヤーを管理するクラス。
-    """
-    def __init__(self, x: int, y: int, image_path: str):
-        """
-        プレイヤーの初期位置と画像を設定する。
-        :param x: 初期x座標
-        :param y: 初期y座標
-        :param image_path: プレイヤー画像のパス
-        """
-        self.x: int = x
-        self.y: int = y
-        self.image: pg.Surface = pg.image.load(image_path)
-        self.moved: bool = False
+    while stack:
+        x, y = stack[-1]
+        random.shuffle(directions)
+        for dx, dy in directions:
+            nx, ny = x + dx, y + dy
+            if 0 < nx < width and 0 < ny < height and maze[ny][nx] == 1:
+                maze[ny][nx] = 0
+                maze[y + dy // 2][x + dx // 2] = 0
+                stack.append((nx, ny))
+                break
+        else:
+            stack.pop()
 
-    def move(self, dx: int, dy: int, game_map: list[list[int]]) -> None:
-        """
-        プレイヤーの移動を管理する。
-        :param dx: x方向の移動量
-        :param dy: y方向の移動量
-        :param game_map: 現在のマップデータ
-        """
-        if not self.moved:
-            new_x = self.x + dx
-            new_y = self.y + dy
-            if 0 <= new_x < len(game_map[0]) and 0 <= new_y < len(game_map):
-                if game_map[new_y][new_x] == 0:  # 道のみ移動可能
-                    self.x = new_x
-                    self.y = new_y
-            self.moved = True
+    return maze
 
-    def reset_movement(self) -> None:
-        """
-        移動状態をリセットする。
-        """
-        self.moved = False
+# イベントマス生成関数
+def generate_event_tiles(maze):
+    events = {}
 
-    def draw(self, screen: pg.Surface, tile_size: int) -> None:
-        """
-        プレイヤーを描画する。
-        :param screen: Pygameの描画対象Surface
-        :param tile_size: 1マスあたりのサイズ
-        """
-        screen.blit(self.image, (self.x * tile_size, self.y * tile_size))
+    def place_event(event_type, count):
+        placed = 0
+        while placed < count:
+            x, y = random.randint(1, WIDTH - 2), random.randint(1, HEIGHT - 2)
+            if maze[y][x] == 0 and (x, y) not in events:
+                if not any(abs(x - ex) + abs(y - ey) <= 2 for ex, ey in events if events[(ex, ey)] == event_type):
+                    events[(x, y)] = event_type
+                    placed += 1
 
-def main() -> None:
-    """
-    ゲームのメインループ。
-    """
-    pg.display.set_caption("迷路ゲーム")
-    screen = pg.display.set_mode((450, 450))
-    clock = pg.time.Clock()
-    tile_size = 50
+    # 戦闘マス：3~5個を分散して配置
+    place_event("battle", random.randint(3, 5))
 
-    # プレイヤー画像の読み込み
-    player_image_path = "fig/3.png"
+    # 回復マス：1つのみ配置
+    place_event("heal", 1)
 
-    # マップとプレイヤーの初期化
-    map_gen = MapGenerator(9, 9)
-    map_gen.generate_maze()
-    player = Player(1, 1, player_image_path)
+    # 強化マス：2~3個を分散して配置
+    place_event("buff", random.randint(2, 3))
+
+    return events
+
+# ボスマスを生成
+def spawn_boss_tile(maze, events):
+    while True:
+        x, y = random.randint(1, WIDTH - 2), random.randint(1, HEIGHT - 2)
+        if maze[y][x] == 0 and (x, y) not in events:
+            events[(x, y)] = "boss"
+            break
+
+# プレイヤーの初期位置をランダムに設定
+# イベントマスと被らないようにする
+def get_random_start(maze, events):
+    while True:
+        x, y = random.randint(1, WIDTH - 2), random.randint(1, HEIGHT - 2)
+        if maze[y][x] == 0 and (x, y) not in events:
+            return x, y
+
+# 描画関数
+def draw_maze(screen, maze, bg_img, offset_x, offset_y, events):
+    for y, row in enumerate(maze):
+        for x, cell in enumerate(row):
+            rect = (offset_x + x * CELL_SIZE, offset_y + y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+            if cell == 0:  # 白い道のみ描画
+                pg.draw.rect(screen, WHITE, rect)
+            else:  # 壁部分は透明化
+                screen.blit(bg_img, rect, (x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE))
+
+    for (x, y), event_type in events.items():
+        color = EVENT_TYPES[event_type]
+        rect = (offset_x + x * CELL_SIZE, offset_y + y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+        pg.draw.rect(screen, color, rect)
+
+# プレイヤー描画関数
+def draw_player(screen, player_img, player_pos, offset_x, offset_y):
+    x, y = player_pos
+    rect = (offset_x + x * CELL_SIZE, offset_y + y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+    screen.blit(pg.transform.scale(player_img, (CELL_SIZE, CELL_SIZE)), rect)
+
+# プレイヤー移動関数
+def move_player(player_pos, direction, maze, events):
+    x, y = player_pos
+    dx, dy = direction
+    new_x, new_y = x + dx, y + dy
+
+    if 0 <= new_x < WIDTH and 0 <= new_y < HEIGHT and maze[new_y][new_x] == 0:
+        # 戦闘マスを踏むと削除
+        if (new_x, new_y) in events and events[(new_x, new_y)] == "battle":
+            del events[(new_x, new_y)]
+        # ボスマスを踏むと新しいマップを生成
+        if (new_x, new_y) in events and events[(new_x, new_y)] == "boss":
+            return "reset"
+        return new_x, new_y
+
+    return x, y
+
+def main():
+    pg.display.set_caption("はばたけ！こうかとん")
+    screen = pg.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+    clock  = pg.time.Clock()
+    bg_img = pg.image.load("fig/pg_bg.jpg")
+    bg_img = pg.transform.scale(bg_img, (WINDOW_WIDTH, WINDOW_HEIGHT))  # 背景画像をウィンドウ全体に拡大
+
+    player_img = pg.image.load("fig/3.png")  # プレイヤー画像をロード
 
     while True:
-        for event in pg.event.get():
-            if event.type == pg.QUIT:
-                return
-            elif event.type == pg.KEYUP:
-                player.reset_movement()
-        
-        keys = pg.key.get_pressed()
-        if keys[pg.K_UP]:
-            player.move(0, -1, map_gen.map)
-        if keys[pg.K_DOWN]:
-            player.move(0, 1, map_gen.map)
-        if keys[pg.K_LEFT]:
-            player.move(-1, 0, map_gen.map)
-        if keys[pg.K_RIGHT]:
-            player.move(1, 0, map_gen.map)
+        # 迷路生成
+        maze = generate_maze(WIDTH, HEIGHT)
+        events = generate_event_tiles(maze)
 
-        screen.fill((0, 0, 0))
-        map_gen.draw(screen, tile_size)
-        player.draw(screen, tile_size)
-        pg.display.update()
-        clock.tick(60)
+        # プレイヤーの初期位置
+        player_pos = get_random_start(maze, events)
+
+        # 迷路の描画位置を中央に計算
+        offset_x = (WINDOW_WIDTH - WIDTH * CELL_SIZE) // 2
+        offset_y = (WINDOW_HEIGHT - HEIGHT * CELL_SIZE) // 2
+
+        boss_spawned = False
+
+        tmr = 0
+        while True:
+            for event in pg.event.get():
+                if event.type == pg.QUIT: return
+                if event.type == pg.KEYDOWN:
+                    direction = None
+                    if event.key == pg.K_UP:
+                        direction = (0, -1)
+                    elif event.key == pg.K_DOWN:
+                        direction = (0, 1)
+                    elif event.key == pg.K_LEFT:
+                        direction = (-1, 0)
+                    elif event.key == pg.K_RIGHT:
+                        direction = (1, 0)
+
+                    if direction:
+                        result = move_player(player_pos, direction, maze, events)
+                        if result == "reset":
+                            break
+                        else:
+                            player_pos = result
+
+            else:
+                # 全ての戦闘マスを踏んだ場合にボスマスを生成
+                if not boss_spawned and all(e != "battle" for e in events.values()):
+                    spawn_boss_tile(maze, events)
+                    boss_spawned = True
+
+                screen.blit(bg_img, (0, 0))  # 背景画像をウィンドウ全体に表示
+                draw_maze(screen, maze, bg_img, offset_x, offset_y, events)
+                draw_player(screen, player_img, player_pos, offset_x, offset_y)
+                pg.display.update()
+                tmr += 1
+                clock.tick(10)
+                continue
+
+            break
 
 if __name__ == "__main__":
     pg.init()
