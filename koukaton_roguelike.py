@@ -26,6 +26,62 @@ EVENT_TYPES = {
     "boss": PURPLE
 }
 
+# スキルクラス
+class Skill:
+    def __init__(self, name, mana_cost, effect):
+        self.name = name        # スキル名
+        self.mana_cost = mana_cost  # スキルのマナコスト
+        self.effect = effect    # スキルの効果（関数などで実装可能）
+
+# プレイヤーのスキルと敵のスキル共通のスキル候補
+skill_pool = [
+    Skill("Boost Attack", 5, lambda entity: setattr(entity, 'atk', entity.atk + 5)),
+    Skill("Boost Defense", 5, lambda entity: setattr(entity, 'def_', entity.def_ + 5)),
+    Skill("Increase Damage", 4, lambda target: setattr(target, 'def_', max(0, target.def_ - 5))),
+    Skill("Double Strike", 6, lambda entity: setattr(entity, 'next_attack_double', True)),
+    Skill("Life Steal", 8, lambda entity: setattr(entity, 'next_attack_heal', True)),
+    Skill("Nullify Skill", 7, lambda entity: setattr(entity, 'nullify_next_skill', True))
+]
+
+# プレイヤークラス
+class Player:
+    def __init__(self, atk=10, def_=5, mp=20, hp=100):
+        self.atk = atk  # 攻撃力
+        self.def_ = def_  # 防御力
+        self.mp = mp  # マナ
+        self.hp = hp  # 体力
+        self.skills = []  # 所持スキル
+        self.init_skills()  # 初期スキルを設定
+        self.next_attack_double = False  # 次の通常攻撃が二回攻撃になる
+        self.next_attack_heal = False  # 次の通常攻撃で回復する
+        self.nullify_next_skill = False  # 次の相手スキルを無効化
+
+    def init_skills(self):
+        # ランダムに1つスキルを選択して所持
+        self.skills.append(random.choice(skill_pool))
+
+    def take_damage(self, damage):
+        reduced_damage = max(0, damage - self.def_)
+        self.hp -= reduced_damage
+        return self.hp
+
+    def use_mana(self, amount):
+        if self.mp >= amount:
+            self.mp -= amount
+            return True
+        return False
+
+    def normal_attack(self, target):
+        damage = self.atk
+        if self.next_attack_double:
+            damage *= 2
+            self.next_attack_double = False
+        target.take_damage(damage)
+
+        if self.next_attack_heal:
+            self.hp += damage
+            self.next_attack_heal = False
+
 # 迷路生成関数
 def generate_maze(width, height):
     maze = [[1 for _ in range(width)] for _ in range(height)]
@@ -135,11 +191,12 @@ def move_player(player_pos, direction, maze, events):
 def main():
     pg.display.set_caption("はばたけ！こうかとん")
     screen = pg.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-    clock  = pg.time.Clock()
+    clock = pg.time.Clock()
     bg_img = pg.image.load("fig/pg_bg.jpg")
     bg_img = pg.transform.scale(bg_img, (WINDOW_WIDTH, WINDOW_HEIGHT))  # 背景画像をウィンドウ全体に拡大
 
     player_img = pg.image.load("fig/3.png")  # プレイヤー画像をロード
+    player = Player()  # プレイヤーのステータスを初期化
 
     while True:
         # 迷路生成
@@ -158,7 +215,9 @@ def main():
         tmr = 0
         while True:
             for event in pg.event.get():
-                if event.type == pg.QUIT: return
+                if event.type == pg.QUIT:
+                    pg.quit()
+                    sys.exit()
                 if event.type == pg.KEYDOWN:
                     direction = None
                     if event.key == pg.K_UP:
@@ -192,6 +251,7 @@ def main():
                 continue
 
             break
+
 
 if __name__ == "__main__":
     pg.init()
