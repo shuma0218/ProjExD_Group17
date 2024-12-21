@@ -226,17 +226,22 @@ def move_player(player_pos, direction, maze, events):
     dx, dy = direction
     new_x, new_y = x + dx, y + dy  # 移動後の位置を計算
 
-    # 移動可能か確認
     if 0 <= new_x < WIDTH and 0 <= new_y < HEIGHT and maze[new_y][new_x] == 0:
-        # イベントが存在する場合、対応する結果を返す
+        # イベントマスに到達した場合
         if (new_x, new_y) in events:
-            if events[(new_x, new_y)] == "battle":
-                return "battle", new_x, new_y
-            elif events[(new_x, new_y)] == "boss":
-                return "boss", new_x, new_y
-        return (new_x, new_y)  # 通常の移動結果を返す
+            event_type = events[(new_x, new_y)]
+            if event_type == "battle":
+                return "battle", new_x, new_y  # 戦闘マスのイベントを返す
+            elif event_type == "boss":
+                return "boss", new_x, new_y  # ボスマスのイベントを返す
+            elif event_type == "buff":
+                return "buff", new_x, new_y  # 強化マスのイベントを返す
+            elif event_type == "heal":
+                return "heal", new_x, new_y  # 回復マスのイベントを返す
+        return (new_x, new_y)  # 通常移動の場合
 
-    return player_pos  # 移動不可の場合、元の位置を返す
+    return player_pos  # 壁の場合は移動しない
+
 
 def start_battle(screen, player, enemy, ui_buttons, ui_area, log_area):
     battle_logs = []
@@ -258,17 +263,31 @@ def start_battle(screen, player, enemy, ui_buttons, ui_area, log_area):
                 if player.use_mana(action.mana_cost):
                     action.use(player, enemy)
                     battle_logs.append(f"Player used {action.name}!")
-                else:
-                    battle_logs.append("Not enough mana!")
             elif action == "end_turn":
-                is_player_turn = False  # 敵のターンに切り替え
-                used_actions = {"attack": False, "skills": set()}  # 使用済みアクションをリセット
+                is_player_turn = False
+                used_actions = {"attack": False, "skills": set()}
         else:
             # 敵のターン
             enemy_turn(enemy, player, battle_logs)
-            is_player_turn = True  # プレイヤーのターンに切り替え
+            is_player_turn = True
 
-        pg.time.wait(500)  # 各ターン間の待機
+        pg.time.wait(500)
+
+    if player.hp > 0:  # プレイヤーが勝利した場合
+        stat_to_increase = random.choice(["atk", "def_", "hp", "mp"])
+        if stat_to_increase == "atk":
+            player.atk += 3
+            battle_logs.append("Your Attack increased by 3!")
+        elif stat_to_increase == "def_":
+            player.def_ += 3
+            battle_logs.append("Your Defense increased by 3!")
+        elif stat_to_increase == "hp":
+            player.hp += 10
+            battle_logs.append("Your HP increased by 10!")
+        elif stat_to_increase == "mp":
+            player.mp += 5
+            battle_logs.append("Your MP increased by 5!")
+
 
 
 def draw_battle_log(screen, log_area, logs):
@@ -335,6 +354,31 @@ def create_battle_ui(player):
 
     return ui_buttons, ui_area
 
+def create_buff_ui():
+    ui_buttons = []
+    ui_area = pg.Rect(200, 200, 400, 200)  # 中央のエリア
+
+    # スキル追加ボタン
+    add_skill_button = {
+        "rect": pg.Rect(250, 220, 300, 50),
+        "color": (0, 200, 0),
+        "text": "新しいスキルを追加",
+        "action": "add_skill"
+    }
+    ui_buttons.append(add_skill_button)
+
+    # ステータス上昇ボタン
+    increase_stat_button = {
+        "rect": pg.Rect(250, 300, 300, 50),
+        "color": (0, 0, 200),
+        "text": "ステータスを上昇させる",
+        "action": "increase_stat"
+    }
+    ui_buttons.append(increase_stat_button)
+
+    return ui_buttons, ui_area
+
+
 def draw_battle_ui(screen, ui_buttons, ui_area, used_actions):
     pg.draw.rect(screen, (50, 50, 50), ui_area)  # UI背景
 
@@ -350,6 +394,17 @@ def draw_battle_ui(screen, ui_buttons, ui_area, used_actions):
         text_surface = font.render(button["text"], True, (255, 255, 255))
         text_rect = text_surface.get_rect(center=button["rect"].center)
         screen.blit(text_surface, text_rect)
+
+def draw_buff_ui(screen, ui_buttons, ui_area):
+    pg.draw.rect(screen, (50, 50, 50), ui_area)  # UI背景
+    font = pg.font.Font(None, 36)
+
+    for button in ui_buttons:
+        pg.draw.rect(screen, button["color"], button["rect"])
+        text_surface = font.render(button["text"], True, (255, 255, 255))
+        text_rect = text_surface.get_rect(center=button["rect"].center)
+        screen.blit(text_surface, text_rect)
+
 
 def enemy_turn(enemy, player, battle_logs):
     if isinstance(enemy, Boss):
@@ -368,6 +423,47 @@ def enemy_turn(enemy, player, battle_logs):
     damage = max(0, enemy.atk - player.def_)
     player.take_damage(enemy.atk)
     battle_logs.append(f"{'Boss' if isinstance(enemy, Boss) else 'Enemy'} attacks! Player HP: {player.hp}")
+
+def handle_buff_ui(screen, player):
+    ui_buttons, ui_area = create_buff_ui()
+
+    while True:
+        screen.fill((0, 0, 0))  # 背景を黒でリセット
+        draw_buff_ui(screen, ui_buttons, ui_area)
+        pg.display.update()
+
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                pg.quit()
+                sys.exit()
+            if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:  # 左クリック
+                mouse_pos = event.pos
+                for button in ui_buttons:
+                    if button["rect"].collidepoint(mouse_pos):
+                        if button["action"] == "add_skill":
+                            new_skill = random.choice(skill_pool)
+                            player.skills.append(new_skill)
+                            print(f"New skill added: {new_skill.name}")
+                        elif button["action"] == "increase_stat":
+                            stat_to_increase = random.choice(["atk", "def_", "hp", "mp"])
+                            if stat_to_increase == "atk":
+                                player.atk += 5
+                                print("Attack increased by 5!")
+                            elif stat_to_increase == "def_":
+                                player.def_ += 5
+                                print("Defense increased by 5!")
+                            elif stat_to_increase == "hp":
+                                player.hp += 20
+                                print("HP increased by 20!")
+                            elif stat_to_increase == "mp":
+                                player.mp += 10
+                                print("MP increased by 10!")
+                        return  # 選択が終わったら終了
+
+def handle_heal(player):
+    max_hp = 100  # プレイヤーの最大HP（必要に応じて変更可能）
+    player.hp = max_hp
+    print("Player's HP has been fully restored!")
 
 
 def main():
@@ -413,9 +509,12 @@ def main():
 
                     if direction:
                         result = move_player(player_pos, direction, maze, events)
-
-                        if isinstance(result, tuple):  # 移動成功時またはイベント発生時
-                            if result[0] == "battle":
+                        if isinstance(result, tuple):
+                            if result[0] == "heal":
+                                new_x, new_y = result[1], result[2]
+                                handle_heal(player)  # HPを全回復
+                                del events[(new_x, new_y)]  # 回復マスを削除
+                            elif result[0] == "battle":
                                 new_x, new_y = result[1], result[2]
                                 enemy = random.choice(generate_enemy_patterns())
                                 log_area = pg.Rect(200, WINDOW_HEIGHT - 100, WINDOW_WIDTH - 200, 100)
@@ -429,12 +528,15 @@ def main():
                                 ui_buttons, ui_area = create_battle_ui(player)
                                 start_battle(screen, player, boss, ui_buttons, ui_area, log_area)
                                 del events[(new_x, new_y)]  # ボスマスを削除
+                            elif result[0] == "buff":
+                                new_x, new_y = result[1], result[2]
+                                handle_buff_ui(screen, player)  # 強化マスUIを表示
+                                del events[(new_x, new_y)]  # 強化マスを削除
                             else:
-                                player_pos = result  # 通常移動時、プレイヤー位置を更新
+                                player_pos = result  # 通常移動
 
 
             else:
-                # 全ての戦闘マスを踏んだ場合にボスマスを生成
                 if not boss_spawned and all(e != "battle" for e in events.values()):
                     spawn_boss_tile(maze, events)
                     boss_spawned = True
@@ -448,6 +550,7 @@ def main():
                 continue
 
             break
+
 
 
 
