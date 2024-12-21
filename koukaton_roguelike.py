@@ -248,10 +248,29 @@ def start_battle(screen, player, enemy, ui_buttons, ui_area, log_area):
     is_player_turn = True
     used_actions = {"attack": False, "skills": set()}  # 使用済みアクションを追跡
 
+    player_img = pg.image.load("fig/3.png")  # プレイヤー画像をロード
+    # 敵画像の判定
+    if isinstance(enemy, Boss):
+        enemy_img = pg.image.load("fig/aline1.png")  # ボス画像
+    else:
+        enemy_img = pg.image.load("fig/alien1.png")  # 通常敵画像
     while player.hp > 0 and enemy.hp > 0:
         screen.fill((0, 0, 0))  # 背景をリセット
-        draw_battle_ui(screen, ui_buttons, ui_area, used_actions)  # UIの描画
-        draw_battle_log(screen, log_area, battle_logs)  # バトルログの描画
+        battle_area = pg.Rect(200, 100, 400, 300)  # 戦闘エリア
+        pg.draw.rect(screen, (255, 0, 0), battle_area)  # 赤い背景を描画
+
+        # プレイヤー画像を描画
+        player_rect = player_img.get_rect(center=(300, 250))
+        screen.blit(pg.transform.scale(player_img, (80, 80)), player_rect)
+
+        # 敵画像を描画
+        enemy_rect = enemy_img.get_rect(center=(500, 250))
+        screen.blit(pg.transform.scale(enemy_img, (80, 80)), enemy_rect)
+
+        # UIの描画
+        draw_battle_ui(screen, ui_buttons, ui_area, used_actions)
+        draw_battle_log(screen, log_area, battle_logs)
+
         pg.display.update()
 
         if is_player_turn:
@@ -287,6 +306,7 @@ def start_battle(screen, player, enemy, ui_buttons, ui_area, log_area):
         elif stat_to_increase == "mp":
             player.mp += 5
             battle_logs.append("Your MP increased by 5!")
+
 
 
 
@@ -474,6 +494,7 @@ def main():
     bg_img = pg.transform.scale(bg_img, (WINDOW_WIDTH, WINDOW_HEIGHT))  # 背景画像をウィンドウ全体に拡大
 
     player_img = pg.image.load("fig/3.png")  # プレイヤー画像をロード
+    enemy_img = pg.image.load("fig/alien1.png")   # 敵画像
     player = Player()  # プレイヤーのステータスを初期化
 
     while True:
