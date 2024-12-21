@@ -26,22 +26,26 @@ EVENT_TYPES = {
     "boss": PURPLE
 }
 
-# スキルクラス
 class Skill:
     def __init__(self, name, mana_cost, effect):
         self.name = name        # スキル名
-        self.mana_cost = mana_cost  # スキルのマナコスト
-        self.effect = effect    # スキルの効果（関数などで実装可能）
+        self.mana_cost = mana_cost  # マナコスト
+        self.effect = effect    # スキル効果（関数）
+
+    def use(self, caster, target=None):
+        self.effect(caster, target)
+
 
 # プレイヤーのスキルと敵のスキル共通のスキル候補
 skill_pool = [
-    Skill("Boost Attack", 5, lambda entity: setattr(entity, 'atk', entity.atk + 5)),
-    Skill("Boost Defense", 5, lambda entity: setattr(entity, 'def_', entity.def_ + 5)),
-    Skill("Increase Damage", 4, lambda target: setattr(target, 'def_', max(0, target.def_ - 5))),
-    Skill("Double Strike", 6, lambda entity: setattr(entity, 'next_attack_double', True)),
-    Skill("Life Steal", 8, lambda entity: setattr(entity, 'next_attack_heal', True)),
-    Skill("Nullify Skill", 7, lambda entity: setattr(entity, 'nullify_next_skill', True))
+    Skill("Boost Attack", 5, lambda caster, _: setattr(caster, 'atk', caster.atk + 5)),
+    Skill("Boost Defense", 5, lambda caster, _: setattr(caster, 'def_', caster.def_ + 5)),
+    Skill("Increase Damage", 4, lambda _, target: setattr(target, 'def_', max(0, target.def_ - 5))),
+    Skill("Double Strike", 6, lambda caster, _: setattr(caster, 'next_attack_double', True)),
+    Skill("Life Steal", 8, lambda caster, _: setattr(caster, 'next_attack_heal', True)),
+    Skill("Nullify Skill", 7, lambda caster, _: setattr(caster, 'nullify_next_skill', True))
 ]
+
 
 # プレイヤークラス
 class Player:
@@ -78,7 +82,6 @@ class Player:
             damage *= 2
             self.next_attack_double = False
         target.take_damage(damage)
-
         if self.next_attack_heal:
             self.hp += damage
             self.next_attack_heal = False
@@ -252,8 +255,11 @@ def start_battle(screen, player, enemy, ui_buttons, ui_area, log_area):
                 enemy.take_damage(player.atk)
                 battle_logs.append(f"Player attacks! Enemy HP: {enemy.hp}")
             elif isinstance(action, Skill):
-                action.effect(enemy)
-                battle_logs.append(f"Player used {action.name}!")
+                if player.use_mana(action.mana_cost):
+                    action.use(player, enemy)
+                    battle_logs.append(f"Player used {action.name}!")
+                else:
+                    battle_logs.append("Not enough mana!")
             elif action == "end_turn":
                 is_player_turn = False  # 敵のターンに切り替え
                 used_actions = {"attack": False, "skills": set()}  # 使用済みアクションをリセット
@@ -355,7 +361,7 @@ def enemy_turn(enemy, player, battle_logs):
     # 敵のスキル使用
     if enemy.skills:
         skill = random.choice(enemy.skills)
-        skill.effect(player)
+        skill.use(enemy, player)
         battle_logs.append(f"Enemy used {skill.name}! Player HP: {player.hp}")
 
     # 通常攻撃
