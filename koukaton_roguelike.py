@@ -348,7 +348,7 @@ def create_battle_ui(player):
     attack_button = {
         "rect": pg.Rect(40, 50, 120, 40),
         "color": (200, 0, 0),
-        "text": "通常攻撃",
+        "text": "nomal attack",
         "action": "attack"
     }
     ui_buttons.append(attack_button)
@@ -367,7 +367,7 @@ def create_battle_ui(player):
     end_turn_button = {
         "rect": pg.Rect(40, 400, 120, 40),
         "color": (0, 0, 200),
-        "text": "ターン終了",
+        "text": "turn end",
         "action": "end_turn"
     }
     ui_buttons.append(end_turn_button)
@@ -382,7 +382,7 @@ def create_buff_ui():
     add_skill_button = {
         "rect": pg.Rect(250, 220, 300, 50),
         "color": (0, 200, 0),
-        "text": "新しいスキルを追加",
+        "text": "new skill",
         "action": "add_skill"
     }
     ui_buttons.append(add_skill_button)
@@ -391,7 +391,7 @@ def create_buff_ui():
     increase_stat_button = {
         "rect": pg.Rect(250, 300, 300, 50),
         "color": (0, 0, 200),
-        "text": "ステータスを上昇させる",
+        "text": "buff status",
         "action": "increase_stat"
     }
     ui_buttons.append(increase_stat_button)
@@ -487,7 +487,7 @@ def handle_heal(player):
 
 
 def main():
-    pg.display.set_caption("はばたけ！こうかとん")
+    pg.display.set_caption("たたかえ！こうかとん")
     screen = pg.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
     clock = pg.time.Clock()
     bg_img = pg.image.load("fig/pg_bg.jpg")
