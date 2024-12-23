@@ -504,19 +504,19 @@ def handle_buff_ui(screen, player):
                             player.skills.append(new_skill)
                             print(f"New skill added: {new_skill.name}")
                         elif button["action"] == "increase_stat":
-                            stat_to_increase = random.choice(["atk", "def_", "hp", "mp"])
-                            if stat_to_increase == "atk":
-                                player.atk += 5
-                                print("Attack increased by 5!")
-                            elif stat_to_increase == "def_":
-                                player.def_ += 5
-                                print("Defense increased by 5!")
-                            elif stat_to_increase == "hp":
-                                player.hp += 20
-                                print("HP increased by 20!")
-                            elif stat_to_increase == "mp":
-                                player.mp += 10
-                                print("MP increased by 10!")
+                            stat_to_increase = random.choice(["atk", "def_", "hp", "mp"]) # ランダムにステータスを選択 
+                            if stat_to_increase == "atk":  # 攻撃力を上昇
+                                player.atk += 5 # 攻撃力を5上げる
+                                print("Attack increased by 5!") # 攻撃力上昇メッセージを表示
+                            elif stat_to_increase == "def_": # 防御力を上昇
+                                player.def_ += 5 # 防御力を5上げる
+                                print("Defense increased by 5!") # 防御力上昇メッセージを表示
+                            elif stat_to_increase == "hp": # 体力を上昇
+                                player.hp += 20 # 体力を20上げる
+                                print("HP increased by 20!") # 体力上昇メッセージを表示
+                            elif stat_to_increase == "mp": # マナを上昇
+                                player.mp += 10 # マナを10上げる
+                                print("MP increased by 10!") # マナ上昇メッセージを表示
                         return  # 選択が終わったら終了
 
 def handle_heal(player):
