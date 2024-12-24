@@ -2,6 +2,7 @@ import os
 import sys
 import pygame as pg
 import random
+from copy import deepcopy
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
@@ -246,6 +247,7 @@ def move_player(player_pos, direction, maze, events):
 def start_battle(screen, player, enemy, ui_buttons, ui_area, log_area):
     battle_logs = []
     is_player_turn = True
+    previous_skill = None
     used_actions = {"attack": False, "skills": set()}  # 使用済みアクションを追跡
 
     player_img = pg.image.load("fig/3.png")  # プレイヤー画像をロード
@@ -274,7 +276,7 @@ def start_battle(screen, player, enemy, ui_buttons, ui_area, log_area):
         pg.display.update()
 
         if is_player_turn:
-            action = decide_player_action(player, ui_buttons, used_actions)
+            action = decide_player_action(ui_buttons, used_actions)
             if action == "attack":
                 enemy.take_damage(player.atk)
                 battle_logs.append(f"Player attacks! Enemy HP: {enemy.hp}")
@@ -287,7 +289,7 @@ def start_battle(screen, player, enemy, ui_buttons, ui_area, log_area):
                 used_actions = {"attack": False, "skills": set()}
         else:
             # 敵のターン
-            enemy_turn(enemy, player, battle_logs)
+            previus_skill = enemy_turn(enemy, player, battle_logs,previous_skill)
             is_player_turn = True
 
         pg.time.wait(500)
@@ -317,7 +319,7 @@ def draw_battle_log(screen, log_area, logs):
         log_surface = font.render(log, True, WHITE)
         screen.blit(log_surface, (log_area.left + 10, log_area.top + i * 20))
 
-def decide_player_action(player, ui_buttons, used_actions):
+def decide_player_action(ui_buttons, used_actions):
     selected_action = None
 
     while selected_action is None:
@@ -426,23 +428,29 @@ def draw_buff_ui(screen, ui_buttons, ui_area):
         screen.blit(text_surface, text_rect)
 
 
-def enemy_turn(enemy, player, battle_logs):
+def enemy_turn(enemy, player, battle_logs, previous_skill):
+    tmp_skill = deepcopy(enemy.skills)
+    if len(tmp_skill) >= 2 and previous_skill is not None:
+        tmp_skill.remove(previous_skill)
     if isinstance(enemy, Boss):
         # ボスのスキル使用
-        skill = random.choice(enemy.skills)
+        skill = random.choice(tmp_skill)
         skill.effect(player)
         battle_logs.append(f"Boss used {skill.name}! Player HP: {player.hp}")
+        used_skill = skill.name
 
     # 敵のスキル使用
     if enemy.skills:
-        skill = random.choice(enemy.skills)
+        skill = random.choice(tmp_skill)
         skill.use(enemy, player)
         battle_logs.append(f"Enemy used {skill.name}! Player HP: {player.hp}")
+        used_skill = skill.name
 
     # 通常攻撃
     damage = max(0, enemy.atk - player.def_)
-    player.take_damage(enemy.atk)
+    player.take_damage(damage)
     battle_logs.append(f"{'Boss' if isinstance(enemy, Boss) else 'Enemy'} attacks! Player HP: {player.hp}")
+    return used_skill  #このターンで使ったスキルを返す
 
 def handle_buff_ui(screen, player):
     ui_buttons, ui_area = create_buff_ui()
@@ -569,11 +577,6 @@ def main():
                 tmr += 1
                 clock.tick(10)
                 continue
-
-            break
-
-
-
 
 
 if __name__ == "__main__":
