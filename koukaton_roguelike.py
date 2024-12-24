@@ -452,7 +452,7 @@ def enemy_turn(enemy, player, battle_logs):
 
     # 通常攻撃
     damage = max(0, enemy.atk - player.def_)
-    player.take_damage(damage)
+    player.take_damage(enemy.atk)
     txt_attack = f"{'Boss' if isinstance(enemy, Boss) else 'Enemy'} attacks! Player HP: {player.hp}"
     txt = txt_skill + txt_attack  # 2つの文字列を同じ行に追加
     battle_logs.append(txt)
