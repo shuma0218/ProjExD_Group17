@@ -251,7 +251,7 @@ def start_battle(screen, player, enemy, ui_buttons, ui_area, log_area):
     player_img = pg.image.load("fig/3.png")  # プレイヤー画像をロード
     # 敵画像の判定
     if isinstance(enemy, Boss):
-        enemy_img = pg.image.load("fig/aline1.png")  # ボス画像
+        enemy_img = pg.image.load("fig/alien1.png")  # ボス画像
     else:
         enemy_img = pg.image.load("fig/alien1.png")  # 通常敵画像
     while player.hp > 0 and enemy.hp > 0:
