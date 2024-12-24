@@ -276,7 +276,7 @@ def start_battle(screen, player, enemy, ui_buttons, ui_area, log_area):
         pg.display.update()
 
         if is_player_turn:
-            action = decide_player_action(ui_buttons, used_actions)
+            action = decide_player_action(player, ui_buttons, used_actions, battle_logs)
             if action == "attack":
                 enemy.take_damage(player.atk)
                 battle_logs.append(f"Player attacks! Enemy HP: {enemy.hp}")
@@ -323,7 +323,7 @@ def draw_battle_log(screen, log_area, logs):
         log_surface = font.render(log, True, WHITE)
         screen.blit(log_surface, (log_area.left + 10, log_area.top + i * 20))
 
-def decide_player_action(ui_buttons, used_actions):
+def decide_player_action(player, ui_buttons, used_actions, battle_logs):
     selected_action = None
 
     while selected_action is None:
@@ -341,6 +341,8 @@ def decide_player_action(ui_buttons, used_actions):
                             return "attack"
                         elif isinstance(action, Skill) and action not in used_actions["skills"]:
                             used_actions["skills"].add(action)
+                            if player.mp <= action.mana_cost :
+                                battle_logs.append(f"(Failure : This skill requires more mana than you currently have. )")
                             return action
                         elif action == "end_turn":
                             return "end_turn"
