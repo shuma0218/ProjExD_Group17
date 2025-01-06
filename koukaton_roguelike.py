@@ -55,10 +55,6 @@ class Player:
         self.mp = mp  # マナ
         self.hp = hp  # 体力
         self.skills = []  # 所持スキル
-        self.level = 1  # レベル
-        self.experience = 0  # 経験値
-        self.experience_to_next_level = 20  # 次のレベルまでの経験値
-        self.level_history = []  # レベルアップ履歴
         self.init_skills()  # 初期スキルを設定
         self.next_attack_double = False  # 次の通常攻撃が二回攻撃になる
         self.next_attack_heal = False  # 次の通常攻撃で回復する
@@ -73,20 +69,6 @@ class Player:
         if self.hp < 0:
             self.hp = 0  # HPが0未満にならないように調整
         return self.hp
-    
-    def gain_experience(self, amount): # 経験値を獲得
-        self.experience += amount # 経験値を加算
-        while self.experience >= self.experience_to_next_level: # レベルアップ条件を満たすまで繰り返す
-            self.level_up() # レベルアップ処理
-    
-    def level_up(self):  # 追加 レベルアップ処理
-        self.level += 1 # レベルを1上げる
-        self.experience -= self.experience_to_next_level # 経験値をリセット
-        self.experience_to_next_level = int(self.experience_to_next_level * 1.3) # 次のレベルまでの経験値を増やす
-        self.atk += 5 # 攻撃力を5上げる
-        self.hp += 20 # 体力を20上げる
-        self.level_history.append(self.level) # レベルアップ履歴に追加
-        print(f"レベルアップ！現在のレベル: {self.level}") # レベルアップメッセージを表示
     
     def use_mana(self, amount):
         if self.mp >= amount:
@@ -103,23 +85,6 @@ class Player:
         if self.next_attack_heal:
             self.hp += damage
             self.next_attack_heal = False
-
-def draw_player_level(screen, player):  # 追加 プレイヤーのレベルと経験値を描画
-    font = pg.font.Font(None, 36) # フォントを設定
-    level_text = font.render(f"Level: {player.level}", True, (0, 0, 0))  # 文字を黒色に変更
-    experience_text = font.render(f"XP: {player.experience}/{player.experience_to_next_level}", True, (0, 0, 0))  # 文字を黒色に変更
-    atk_text = font.render(f"ATK: {player.atk}", True, (0, 0, 0))  # 追加 攻撃力を表示
-    hp_text = font.render(f"HP: {player.hp}", True, (0, 0, 0))  # 追加 体力を表示
-    mp_text = font.render(f"MP: {player.mp}", True, (0, 0, 0))  # 追加 マナを表示
-    screen.blit(level_text, (10, 10)) # レベル表示の位置を変更
-    screen.blit(experience_text, (10, 50))  # 経験値表示の位置を変更
-    screen.blit(atk_text, (10, 90))  # 追加 攻撃力を表示
-    screen.blit(hp_text, (10, 130))  # 追加 体力を表示
-    screen.blit(mp_text, (10, 170))  # 追加 マナを表示
-
-def handle_battle_victory(player):  # 追加 バトル勝利時の処理
-    player.gain_experience(30)  # 経験値を獲得
-    print("経験値を30獲得しました") # 経験値獲得メッセージを表示
 
 # 敵クラス
 class Enemy:
@@ -196,17 +161,17 @@ def generate_maze(width, height):
     return maze
 
 # イベントマス生成関数
-def generate_event_tiles(maze):
-    events = {}
+def generate_event_tiles(maze): # 戦闘マス、回復マス、強化マス、ボスマスを生成
+    events = {} # イベントマスの座標と種類を格納
 
-    def place_event(event_type, count):
-        placed = 0
-        while placed < count:
-            x, y = random.randint(1, WIDTH - 2), random.randint(1, HEIGHT - 2)
-            if maze[y][x] == 0 and (x, y) not in events:
-                if not any(abs(x - ex) + abs(y - ey) <= 2 for ex, ey in events if events[(ex, ey)] == event_type):
-                    events[(x, y)] = event_type
-                    placed += 1
+    def place_event(event_type, count): # イベントマスを配置
+        placed = 0 # 配置済みのイベント数
+        while placed < count: # 指定数だけ配置するまで繰り返す
+            x, y = random.randint(1, WIDTH - 2), random.randint(1, HEIGHT - 2) # ランダムな座標を取得
+            if maze[y][x] == 0 and (x, y) not in events: # 道であり、イベントマスと被っていない場合
+                if not any(abs(x - ex) + abs(y - ey) <= 2 for ex, ey in events if events[(ex, ey)] == event_type): # 2マス以内に同種のイベントがない場合
+                    events[(x, y)] = event_type # イベントマスを配置
+                    placed += 1 # 配置済みのイベント数を増やす
 
     # 戦闘マス：3~5個を分散して配置
     place_event("battle", random.randint(3, 5))
@@ -221,10 +186,6 @@ def generate_event_tiles(maze):
 
 # ボスマスを生成
 def spawn_boss_tile(maze, events):
-    offset_x, offset_y = (WINDOW_WIDTH - WIDTH * CELL_SIZE) // 2, (WINDOW_HEIGHT - HEIGHT * CELL_SIZE) // 2
-
-    offset_x, offset_y = (WINDOW_WIDTH - WIDTH * CELL_SIZE) // 2, (WINDOW_HEIGHT - HEIGHT * CELL_SIZE) // 2
-
     while True:
         x, y = random.randint(1, WIDTH - 2), random.randint(1, HEIGHT - 2)
         if maze[y][x] == 0 and (x, y) not in events:
@@ -290,7 +251,7 @@ def start_battle(screen, player, enemy, ui_buttons, ui_area, log_area):
     player_img = pg.image.load("fig/3.png")  # プレイヤー画像をロード
     # 敵画像の判定
     if isinstance(enemy, Boss):
-        enemy_img = pg.image.load("fig/aline1.png")  # ボス画像
+        enemy_img = pg.image.load("fig/alien1.png")  # ボス画像
     else:
         enemy_img = pg.image.load("fig/alien1.png")  # 通常敵画像
     while player.hp > 0 and enemy.hp > 0:
@@ -504,19 +465,19 @@ def handle_buff_ui(screen, player):
                             player.skills.append(new_skill)
                             print(f"New skill added: {new_skill.name}")
                         elif button["action"] == "increase_stat":
-                            stat_to_increase = random.choice(["atk", "def_", "hp", "mp"]) # ランダムにステータスを選択 
-                            if stat_to_increase == "atk":  # 攻撃力を上昇
-                                player.atk += 5 # 攻撃力を5上げる
-                                print("Attack increased by 5!") # 攻撃力上昇メッセージを表示
-                            elif stat_to_increase == "def_": # 防御力を上昇
-                                player.def_ += 5 # 防御力を5上げる
-                                print("Defense increased by 5!") # 防御力上昇メッセージを表示
-                            elif stat_to_increase == "hp": # 体力を上昇
-                                player.hp += 20 # 体力を20上げる
-                                print("HP increased by 20!") # 体力上昇メッセージを表示
-                            elif stat_to_increase == "mp": # マナを上昇
-                                player.mp += 10 # マナを10上げる
-                                print("MP increased by 10!") # マナ上昇メッセージを表示
+                            stat_to_increase = random.choice(["atk", "def_", "hp", "mp"])
+                            if stat_to_increase == "atk":
+                                player.atk += 5
+                                print("Attack increased by 5!")
+                            elif stat_to_increase == "def_":
+                                player.def_ += 5
+                                print("Defense increased by 5!")
+                            elif stat_to_increase == "hp":
+                                player.hp += 20
+                                print("HP increased by 20!")
+                            elif stat_to_increase == "mp":
+                                player.mp += 10
+                                print("MP increased by 10!")
                         return  # 選択が終わったら終了
 
 def handle_heal(player):
@@ -544,15 +505,18 @@ def main():
         # プレイヤーの初期位置
         player_pos = get_random_start(maze, events)
 
-        # オフセットの計算
-        offset_x, offset_y = (WINDOW_WIDTH - WIDTH * CELL_SIZE) // 2, (WINDOW_HEIGHT - HEIGHT * CELL_SIZE) // 2
+        # 迷路の描画位置を中央に計算
+        offset_x = (WINDOW_WIDTH - WIDTH * CELL_SIZE) // 2
+        offset_y = (WINDOW_HEIGHT - HEIGHT * CELL_SIZE) // 2
 
-        running = True
-        while running:
+        boss_spawned = False
+
+        tmr = 0
+        while True:
             for event in pg.event.get():
                 if event.type == pg.QUIT:
-                    running = False
-
+                    pg.quit()
+                    sys.exit()
                 if event.type == pg.KEYDOWN:
                     direction = None
                     if event.key == pg.K_UP:
@@ -565,35 +529,48 @@ def main():
                         direction = (1, 0)
 
                     if direction:
-                        result = move_player(player_pos, direction, maze, events) # プレイヤーの移動
-                        if isinstance(result, tuple): # 戻り値がタプルの場合
-                            if result[0] == "heal": # 回復マスに到達した場合
-                                new_x, new_y = result[1], result[2] # 回復マスの座標を取得
+                        result = move_player(player_pos, direction, maze, events)
+                        if isinstance(result, tuple):
+                            if result[0] == "heal":
+                                new_x, new_y = result[1], result[2]
                                 handle_heal(player)  # HPを全回復
                                 del events[(new_x, new_y)]  # 回復マスを削除
-                            elif result[0] == "battle": # 戦闘マスに到達した場合
-                                new_x, new_y = result[1], result[2] # 戦闘マスの座標を取得
-                                enemy = random.choice(generate_enemy_patterns()) # 敵をランダム生成
-                                start_battle(screen, player, enemy, *create_battle_ui(player), pg.Rect(200, 400, 400, 100))  # 戦闘処理
-                                handle_battle_victory(player)  # 勝利時の処理
-                            elif result[0] == "buff": # 強化マスに到達した場合
-                                new_x, new_y = result[1], result[2] # 強化マスの座標を取得
+                            elif result[0] == "battle":
+                                new_x, new_y = result[1], result[2]
+                                enemy = random.choice(generate_enemy_patterns())
+                                log_area = pg.Rect(200, WINDOW_HEIGHT - 100, WINDOW_WIDTH - 200, 100)
+                                ui_buttons, ui_area = create_battle_ui(player)
+                                start_battle(screen, player, enemy, ui_buttons, ui_area, log_area)
+                                del events[(new_x, new_y)]  # 戦闘マスを削除
+                            elif result[0] == "boss":
+                                new_x, new_y = result[1], result[2]
+                                boss = Boss()
+                                log_area = pg.Rect(200, WINDOW_HEIGHT - 100, WINDOW_WIDTH - 200, 100)
+                                ui_buttons, ui_area = create_battle_ui(player)
+                                start_battle(screen, player, boss, ui_buttons, ui_area, log_area)
+                                del events[(new_x, new_y)]  # ボスマスを削除
+                            elif result[0] == "buff":
+                                new_x, new_y = result[1], result[2]
                                 handle_buff_ui(screen, player)  # 強化マスUIを表示
                                 del events[(new_x, new_y)]  # 強化マスを削除
                             else:
                                 player_pos = result  # 通常移動
 
-            screen.fill((0, 0, 0))  # 背景を黒で塗りつぶす
-            screen.blit(bg_img, (0, 0))  # 背景画像をウィンドウ全体に表示
-            draw_maze(screen, maze, bg_img, offset_x, offset_y, events) # 迷路を描画
-            draw_player(screen, player_img, player_pos, offset_x, offset_y) # プレイヤーを描画
-            draw_player_level(screen, player)  # プレイヤーのレベルと経験値を描画
 
-            pg.display.flip() # 画面を更新
-            clock.tick(60)  # フレームレートを60に設定
+            else:
+                if not boss_spawned and all(e != "battle" for e in events.values()):
+                    spawn_boss_tile(maze, events)
+                    boss_spawned = True
 
-        pg.quit() # ゲーム終了
+                screen.blit(bg_img, (0, 0))  # 背景画像をウィンドウ全体に表示
+                draw_maze(screen, maze, bg_img, offset_x, offset_y, events)
+                draw_player(screen, player_img, player_pos, offset_x, offset_y)
+                pg.display.update()
+                tmr += 1
+                clock.tick(10)
+                continue
 
+            break
 
 
 
