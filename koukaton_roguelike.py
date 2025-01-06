@@ -438,7 +438,7 @@ def enemy_turn(enemy, player, battle_logs):
     if isinstance(enemy, Boss):
         # ボスのスキル使用
         skill = random.choice(enemy.skills)
-        skill.effect(player)
+        skill.effect(enemy, player)
         txt_skill = f"Boss used {skill.name}!  "
         used_skill = skill.name
 
@@ -571,7 +571,6 @@ def main():
                                 del events[(new_x, new_y)]  # 強化マスを削除
                             else:
                                 player_pos = result  # 通常移動
-
 
             else:
                 if not boss_spawned and all(e != "battle" for e in events.values()):
