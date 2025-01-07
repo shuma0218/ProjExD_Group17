@@ -49,7 +49,7 @@ skill_pool = [
 
 # プレイヤークラス
 class Player:
-    def __init__(self, atk=10, def_=5, mp=20, hp=100):
+    def __init__(self, atk=35, def_=5, mp=20, hp=200):
         self.atk = atk  # 攻撃力
         self.def_ = def_  # 防御力
         self.mp = mp  # マナ
