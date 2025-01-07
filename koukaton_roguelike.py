@@ -94,6 +94,7 @@ class Enemy:
         self.def_ = def_  # 防御力
         self.hp = hp  # 体力（低めに設定）
         self.skills = random.sample(skill_pool, 2)  # 初期から2つのスキルをランダムに所持
+        self.previous_skill = None  # 前のターンで使ったスキル
 
     def take_damage(self, damage):
         reduced_damage = max(0, damage - self.def_)
@@ -247,7 +248,6 @@ def move_player(player_pos, direction, maze, events):
 def start_battle(screen, player, enemy, ui_buttons, ui_area, log_area):
     battle_logs = []
     is_player_turn = True
-    previous_skill = None
     used_actions = {"attack": False, "skills": set()}  # 使用済みアクションを追跡
 
     player_img = pg.image.load("fig/3.png")  # プレイヤー画像をロード
@@ -276,20 +276,24 @@ def start_battle(screen, player, enemy, ui_buttons, ui_area, log_area):
         pg.display.update()
 
         if is_player_turn:
-            action = decide_player_action(ui_buttons, used_actions)
+            action = decide_player_action(player, ui_buttons, used_actions, battle_logs)
             if action == "attack":
                 enemy.take_damage(player.atk)
                 battle_logs.append(f"Player attacks! Enemy HP: {enemy.hp}")
             elif isinstance(action, Skill):
                 if player.use_mana(action.mana_cost):
                     action.use(player, enemy)
-                    battle_logs.append(f"Player used {action.name}!")
+                    txt_action = f"Player used {action.name}!  "
+                    txt_mana = f"(Player Mana: {player.mp} remained)"
+                    txt = txt_action + txt_mana
+                    battle_logs.append(txt)
+
             elif action == "end_turn":
                 is_player_turn = False
                 used_actions = {"attack": False, "skills": set()}
         else:
             # 敵のターン
-            previus_skill = enemy_turn(enemy, player, battle_logs,previous_skill)
+            enemy_turn(enemy, player, battle_logs)
             is_player_turn = True
 
         pg.time.wait(500)
@@ -319,7 +323,7 @@ def draw_battle_log(screen, log_area, logs):
         log_surface = font.render(log, True, WHITE)
         screen.blit(log_surface, (log_area.left + 10, log_area.top + i * 20))
 
-def decide_player_action(ui_buttons, used_actions):
+def decide_player_action(player, ui_buttons, used_actions, battle_logs):
     selected_action = None
 
     while selected_action is None:
@@ -337,6 +341,8 @@ def decide_player_action(ui_buttons, used_actions):
                             return "attack"
                         elif isinstance(action, Skill) and action not in used_actions["skills"]:
                             used_actions["skills"].add(action)
+                            if player.mp <= action.mana_cost :
+                                battle_logs.append(f"(Failure : This skill requires more mana than you currently have. )")
                             return action
                         elif action == "end_turn":
                             return "end_turn"
@@ -428,29 +434,31 @@ def draw_buff_ui(screen, ui_buttons, ui_area):
         screen.blit(text_surface, text_rect)
 
 
-def enemy_turn(enemy, player, battle_logs, previous_skill):
-    tmp_skill = deepcopy(enemy.skills)
-    if len(tmp_skill) >= 2 and previous_skill is not None:
-        tmp_skill.remove(previous_skill)
+def enemy_turn(enemy, player, battle_logs):
     if isinstance(enemy, Boss):
         # ボスのスキル使用
-        skill = random.choice(tmp_skill)
-        skill.effect(player)
-        battle_logs.append(f"Boss used {skill.name}! Player HP: {player.hp}")
+        skill = random.choice(enemy.skills)
+        skill.effect(enemy, player)
+        txt_skill = f"Boss used {skill.name}!  "
         used_skill = skill.name
 
     # 敵のスキル使用
     if enemy.skills:
-        skill = random.choice(tmp_skill)
+        while True:
+            skill = random.choice(enemy.skills)
+            if skill.name != enemy.previous_skill :
+                break
         skill.use(enemy, player)
-        battle_logs.append(f"Enemy used {skill.name}! Player HP: {player.hp}")
+        txt_skill = f"Enemy used {skill.name}!  "
         used_skill = skill.name
 
     # 通常攻撃
     damage = max(0, enemy.atk - player.def_)
-    player.take_damage(damage)
-    battle_logs.append(f"{'Boss' if isinstance(enemy, Boss) else 'Enemy'} attacks! Player HP: {player.hp}")
-    return used_skill  #このターンで使ったスキルを返す
+    player.take_damage(enemy.atk)
+    txt_attack = f"{'Boss' if isinstance(enemy, Boss) else 'Enemy'} attacks! Player HP: {player.hp}"
+    txt = txt_skill + txt_attack  # 2つの文字列を同じ行に追加
+    battle_logs.append(txt)
+    enemy.previous_skill = used_skill  #このターンで使ったに更新
 
 def handle_buff_ui(screen, player):
     ui_buttons, ui_area = create_buff_ui()
@@ -563,7 +571,6 @@ def main():
                                 del events[(new_x, new_y)]  # 強化マスを削除
                             else:
                                 player_pos = result  # 通常移動
-
 
             else:
                 if not boss_spawned and all(e != "battle" for e in events.values()):
